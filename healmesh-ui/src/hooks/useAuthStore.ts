@@ -17,6 +17,7 @@ interface AuthState {
   setIsAccessModalOpen: (open: boolean) => void
   login: (email: string) => { success: boolean; message?: string }
   signup: (name: string, email: string) => { success: boolean; message: string }
+  simulateIncomingRequest: (name?: string, email?: string) => void
   approveUser: (id: string) => void
   rejectUser: (id: string) => void
   switchUser: (user: User) => void
@@ -47,6 +48,14 @@ const INITIAL_USERS: User[] = [
     role: 'VIEWER',
     status: 'PENDING',
     createdAt: '2026-08-31 11:45:00',
+  },
+  {
+    id: 'usr_riya_demo',
+    name: 'Riya (Applicant)',
+    email: 'riya12356@gmail.com',
+    role: 'VIEWER',
+    status: 'PENDING',
+    createdAt: '2026-08-31 19:54:00',
   },
 ]
 
@@ -80,6 +89,12 @@ export const useAuthStore = create<AuthState>()(
       signup: (name, email) => {
         const existing = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
         if (existing) {
+          if (existing.status === 'PENDING') {
+            return {
+              success: true,
+              message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
+            }
+          }
           return { success: false, message: 'An account with this email already exists.' }
         }
         const newUser: User = {
@@ -95,6 +110,19 @@ export const useAuthStore = create<AuthState>()(
           success: true,
           message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
         }
+      },
+
+      simulateIncomingRequest: (name = 'Samira Khan (SRE)', email = 'samira@infrastructure.io') => {
+        const id = `usr_${Date.now()}`
+        const newUser: User = {
+          id,
+          name,
+          email,
+          role: 'VIEWER',
+          status: 'PENDING',
+          createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        }
+        set((state) => ({ users: [newUser, ...state.users] }))
       },
 
       approveUser: (id) => {
@@ -118,7 +146,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'healmesh-auth-store',
+      name: 'healmesh-auth-store-v2',
     }
   )
 )

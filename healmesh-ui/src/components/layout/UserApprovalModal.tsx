@@ -3,7 +3,7 @@ import { X, ShieldCheck, UserCheck, UserX, Clock, ShieldAlert } from 'lucide-rea
 import { useAuthStore, type User } from '../../hooks/useAuthStore'
 
 export default function UserApprovalModal() {
-  const { users, currentUser, isAccessModalOpen, setIsAccessModalOpen, approveUser, rejectUser, switchUser } = useAuthStore()
+  const { users, currentUser, isAccessModalOpen, setIsAccessModalOpen, approveUser, rejectUser, switchUser, simulateIncomingRequest } = useAuthStore()
 
   if (!isAccessModalOpen) return null
 
@@ -80,12 +80,21 @@ export default function UserApprovalModal() {
 
             {/* Section 1: Pending Sign-up Approvals */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Clock size={16} className="text-amber-400" />
-                <h4 className="font-serif font-bold text-sm text-white">Pending Sign-Up Requests</h4>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {pendingUsers.length} Pending
-                </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-amber-400" />
+                  <h4 className="font-serif font-bold text-sm text-white">Pending Sign-Up Requests</h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {pendingUsers.length} Pending
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => simulateIncomingRequest()}
+                  className="text-xs font-serif text-hm-cyan hover:text-white px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-all font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <span>+ Test Incoming Sign-Up</span>
+                </button>
               </div>
 
               {pendingUsers.length === 0 ? (
