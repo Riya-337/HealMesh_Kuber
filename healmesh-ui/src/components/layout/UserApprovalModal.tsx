@@ -98,8 +98,17 @@ export default function UserApprovalModal() {
               </div>
 
               {pendingUsers.length === 0 ? (
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-center text-xs text-white/40 font-serif">
-                  No new sign-up requests awaiting approval.
+                <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 text-center space-y-3">
+                  <div className="text-xs text-white/50 font-serif">
+                    No new sign-up requests currently awaiting review.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => simulateIncomingRequest()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-hm-cyan/20 border border-hm-cyan/40 text-hm-cyan hover:bg-hm-cyan hover:text-slate-950 text-xs font-serif font-bold transition-all cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                  >
+                    <span>⚡ Click to generate a test applicant</span>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2.5">

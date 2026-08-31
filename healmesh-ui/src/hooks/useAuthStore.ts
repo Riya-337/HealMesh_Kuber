@@ -87,20 +87,33 @@ export const useAuthStore = create<AuthState>()(
       },
 
       signup: (name, email) => {
-        const existing = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        const trimmedEmail = email.trim().toLowerCase()
+        const trimmedName = name.trim()
+        const existing = get().users.find((u) => u.email.toLowerCase() === trimmedEmail)
+
         if (existing) {
-          if (existing.status === 'PENDING') {
-            return {
-              success: true,
-              message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
-            }
+          set((state) => ({
+            users: state.users.map((u) =>
+              u.email.toLowerCase() === trimmedEmail
+                ? {
+                    ...u,
+                    name: trimmedName || u.name,
+                    status: 'PENDING',
+                    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+                  }
+                : u
+            ),
+          }))
+          return {
+            success: true,
+            message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
           }
-          return { success: false, message: 'An account with this email already exists.' }
         }
+
         const newUser: User = {
           id: `usr_${Date.now()}`,
-          name,
-          email,
+          name: trimmedName,
+          email: trimmedEmail,
           role: 'VIEWER',
           status: 'PENDING',
           createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -112,12 +125,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      simulateIncomingRequest: (name = 'Samira Khan (SRE)', email = 'samira@infrastructure.io') => {
+      simulateIncomingRequest: (name = 'Samira Khan (SRE)', email?: string) => {
+        const randomNum = Math.floor(Math.random() * 900) + 100
+        const applicantEmail = email || `applicant_${randomNum}@mesh.dev`
         const id = `usr_${Date.now()}`
         const newUser: User = {
           id,
-          name,
-          email,
+          name: `${name} #${randomNum}`,
+          email: applicantEmail,
           role: 'VIEWER',
           status: 'PENDING',
           createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
