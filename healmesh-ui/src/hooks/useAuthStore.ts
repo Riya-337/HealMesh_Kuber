@@ -133,7 +133,7 @@ export const useAuthStore = create<AuthState>()(
 
       rejectUser: (id) => {
         set((state) => ({
-          users: state.users.map((u) => (u.id === id ? { ...u, status: 'REJECTED' } : u)),
+          users: state.users.filter((u) => u.id !== id),
         }))
       },
 

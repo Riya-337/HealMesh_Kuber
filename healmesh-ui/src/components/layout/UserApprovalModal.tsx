@@ -8,7 +8,7 @@ export default function UserApprovalModal() {
   if (!isAccessModalOpen) return null
 
   const pendingUsers = users.filter((u) => u.status === 'PENDING')
-  const activeUsers = users.filter((u) => u.status !== 'PENDING')
+  const activeUsers = users.filter((u) => u.status === 'ACTIVE')
   const isAdmin = currentUser?.role === 'ADMIN'
 
   return (
@@ -62,7 +62,7 @@ export default function UserApprovalModal() {
                 <span className="text-[10px] text-hm-cyan font-mono">Current: {currentUser?.name} ({currentUser?.role})</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {users.map((u) => (
+                {activeUsers.map((u) => (
                   <button
                     key={u.id}
                     onClick={() => switchUser(u)}
