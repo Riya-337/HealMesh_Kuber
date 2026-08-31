@@ -5,6 +5,7 @@ Slack notification sender for HealMesh diagnoses.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -63,10 +64,33 @@ class SlackNotifier:
         ]
         if diagnosis.suggested_manual_command:
             blocks.append({"type": "section", "text": {"type": "mrkdwn",
-                "text": f"*Suggested Command (human to run):*\n```{diagnosis.suggested_manual_command}```"}})
+        # Phase 2 Interactive Human Approval Buttons
+        action_payload_approve = json.dumps({"action_id": str(incident.incident_id), "decision": "approved"})
+        action_payload_reject = json.dumps({"action_id": str(incident.incident_id), "decision": "rejected"})
+
+        blocks.append({
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "✅ Authorize & Apply Fix", "emoji": True},
+                    "style": "primary",
+                    "action_id": "approve_remediation",
+                    "value": action_payload_approve,
+                },
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "❌ Reject Proposal", "emoji": True},
+                    "style": "danger",
+                    "action_id": "reject_remediation",
+                    "value": action_payload_reject,
+                }
+            ]
+        })
+
         blocks.append({"type": "divider"})
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
-            "text": f"🤖 HealMesh | Phase 1 (Read-Only) | Model: {diagnosis.llm_model} | Latency: {diagnosis.latency_ms}ms"}]})
+            "text": f"🤖 HealMesh | Phase 2 Human Approval Gate | Model: {diagnosis.llm_model} | Latency: {diagnosis.latency_ms}ms"}]})
 
         try:
             self._client.chat_postMessage(
