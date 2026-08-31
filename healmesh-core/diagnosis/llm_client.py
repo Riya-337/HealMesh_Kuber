@@ -88,7 +88,8 @@ class GeminiClient:
             self.groq_client = Groq(api_key=api_key)
             logger.info("Initialized Groq client with model: %s", self.model_name)
         else:
-            api_key = os.environ.get("GEMINI_API_KEY")
+            from schema.config import get_secret
+            api_key = get_secret("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError(
                     "GEMINI_API_KEY environment variable is not set. "
