@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export interface User {
   id: string
@@ -49,68 +50,75 @@ const INITIAL_USERS: User[] = [
   },
 ]
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  currentUser: INITIAL_USERS[0], // Default logged-in as Riya Aggarwal (Admin)
-  users: INITIAL_USERS,
-  isAccessModalOpen: false,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      currentUser: INITIAL_USERS[0], // Default logged-in as Riya Aggarwal (Admin)
+      users: INITIAL_USERS,
+      isAccessModalOpen: false,
 
-  setIsAccessModalOpen: (open) => set({ isAccessModalOpen: open }),
+      setIsAccessModalOpen: (open) => set({ isAccessModalOpen: open }),
 
-  login: (email) => {
-    const user = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
-    if (!user) {
-      return { success: false, message: 'User account not found. Please request access.' }
+      login: (email) => {
+        const user = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        if (!user) {
+          return { success: false, message: 'User account not found. Please request access.' }
+        }
+        if (user.status === 'PENDING') {
+          return {
+            success: false,
+            message: 'Your account is pending approval by the Admin (Riya Aggarwal). Access is restricted until approved.',
+          }
+        }
+        if (user.status === 'REJECTED') {
+          return { success: false, message: 'Access request was rejected by Admin.' }
+        }
+        set({ currentUser: user })
+        return { success: true }
+      },
+
+      signup: (name, email) => {
+        const existing = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        if (existing) {
+          return { success: false, message: 'An account with this email already exists.' }
+        }
+        const newUser: User = {
+          id: `usr_${Date.now()}`,
+          name,
+          email,
+          role: 'VIEWER',
+          status: 'PENDING',
+          createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        }
+        set((state) => ({ users: [newUser, ...state.users] }))
+        return {
+          success: true,
+          message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
+        }
+      },
+
+      approveUser: (id) => {
+        set((state) => ({
+          users: state.users.map((u) => (u.id === id ? { ...u, status: 'ACTIVE' } : u)),
+        }))
+      },
+
+      rejectUser: (id) => {
+        set((state) => ({
+          users: state.users.map((u) => (u.id === id ? { ...u, status: 'REJECTED' } : u)),
+        }))
+      },
+
+      switchUser: (user) => {
+        set({ currentUser: user })
+      },
+
+      logout: () => {
+        set({ currentUser: null })
+      },
+    }),
+    {
+      name: 'healmesh-auth-store',
     }
-    if (user.status === 'PENDING') {
-      return {
-        success: false,
-        message: 'Your account is pending approval by the Admin (Riya Aggarwal). Access is restricted until approved.',
-      }
-    }
-    if (user.status === 'REJECTED') {
-      return { success: false, message: 'Access request was rejected by Admin.' }
-    }
-    set({ currentUser: user })
-    return { success: true }
-  },
-
-  signup: (name, email) => {
-    const existing = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
-    if (existing) {
-      return { success: false, message: 'An account with this email already exists.' }
-    }
-    const newUser: User = {
-      id: `usr_${Date.now()}`,
-      name,
-      email,
-      role: 'VIEWER',
-      status: 'PENDING',
-      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    }
-    set((state) => ({ users: [newUser, ...state.users] }))
-    return {
-      success: true,
-      message: 'Access request submitted! Your account is pending review by Admin (Riya Aggarwal).',
-    }
-  },
-
-  approveUser: (id) => {
-    set((state) => ({
-      users: state.users.map((u) => (u.id === id ? { ...u, status: 'ACTIVE' } : u)),
-    }))
-  },
-
-  rejectUser: (id) => {
-    set((state) => ({
-      users: state.users.map((u) => (u.id === id ? { ...u, status: 'REJECTED' } : u)),
-    }))
-  },
-
-  switchUser: (user) => {
-    set({ currentUser: user })
-  },
-
-  logout: () => {
-    set({ currentUser: null })
-  },
-}))
+  )
+)
