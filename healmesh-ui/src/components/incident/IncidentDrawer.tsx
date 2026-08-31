@@ -15,11 +15,14 @@ import LogSnippet from './LogSnippet'
 import ActionPanel from './ActionPanel'
 import PodHologramCanvas from '../three/PodHologramCanvas'
 import { formatRelativeTime, getFailureColor } from '../../lib/utils'
+import { useAuthStore } from '../../hooks/useAuthStore'
+import { Lock } from 'lucide-react'
 
 type ResizeDir = 'e' | 'w' | 's' | 'n' | 'se' | 'sw' | 'ne' | 'nw'
 
 export default function IncidentDrawer() {
   const { selected, drawerOpen, closeDrawer } = useIncidentStore()
+  const { currentUser } = useAuthStore()
   const [copied, setCopied] = useState(false)
 
   // Floating Window Coordinates & Size
@@ -355,10 +358,28 @@ export default function IncidentDrawer() {
                   No mutation required — external dependency failure
                 </p>
               </div>
+            ) : currentUser?.role !== 'ADMIN' ? (
+              <div className="space-y-2">
+                <button
+                  disabled
+                  className="w-full py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs font-serif font-bold text-amber-300/60 cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Lock size={14} className="text-amber-400" /> Only Admin (Riya Aggarwal) Can Authorize Fixes
+                </button>
+                <p className="text-center text-[10px] text-white/40 font-serif">
+                  Your current account ({currentUser?.name || 'Viewer'}) does not possess cluster-level write permissions.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
-                <button className="btn-primary w-full py-3 text-xs font-serif flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(99,102,241,0.4)] cursor-pointer">
-                  <Activity size={14} /> Slide to Authorize Fix
+                <button
+                  onClick={() => {
+                    alert(`✅ [HEALMESH EXECUTOR] Remediation action "${selected.parsed_action.action_type}" authorized by Admin (Riya Aggarwal). Sent to Go Executor write-path.`)
+                    closeDrawer()
+                  }}
+                  className="btn-primary w-full py-3 text-xs font-serif flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(99,102,241,0.4)] cursor-pointer"
+                >
+                  <CheckCircle size={14} /> Authorize & Apply {selected.parsed_action.action_type} Fix
                 </button>
                 <button
                   onClick={closeDrawer}

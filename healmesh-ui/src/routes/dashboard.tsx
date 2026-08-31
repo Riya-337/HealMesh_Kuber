@@ -3,6 +3,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import IncidentDrawer from "@/components/incident/IncidentDrawer";
 import ChaosLabDock from "@/components/chaos/ChaosLabDock";
+import UserApprovalModal from "@/components/layout/UserApprovalModal";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
@@ -18,6 +19,7 @@ function DashboardLayout() {
           <Outlet />
           <IncidentDrawer />
           <ChaosLabDock />
+          <UserApprovalModal />
         </main>
       </div>
     </div>
