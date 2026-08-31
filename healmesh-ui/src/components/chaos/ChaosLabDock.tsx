@@ -12,25 +12,58 @@ const CHAOS_ACTIONS: { label: string; icon: string; type: FailureType; namespace
   { label: 'Readiness',  icon: '⏳', type: 'FailedRollout',     namespace: 'monitoring' },
 ]
 
+import { api } from '../../lib/api'
+
 export default function ChaosLabDock() {
   const [open, setOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const { addSimulated } = useIncidentStore()
 
-  const inject = (action: typeof CHAOS_ACTIONS[0]) => {
+  const inject = async (action: typeof CHAOS_ACTIONS[0]) => {
+    const podSuffix = Math.random().toString(36).slice(2, 7)
+    const podName = `${action.namespace}-svc-${podSuffix}`
+    const incId = `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0')}`
+
+    const logLinesMap: Record<string, string[]> = {
+      CrashLoopBackOff: ['Error: panic: runtime error: invalid memory address or nil pointer dereference', 'goroutine 1 [running]: main.main()', 'Back-off 2m20s restarting failed container'],
+      OOMKilled: ['java.lang.OutOfMemoryError: Java heap space', 'Memory limit of 512Mi exceeded', 'Command terminated with exit code 137'],
+      ImagePullBackOff: ['Failed to pull image "registry.internal/v2/app:latest": 404 Not Found', 'Error: ErrImagePull', 'Back-off pulling image'],
+      FailedRollout: ['Deployment rollout is not making progress', 'Readiness probe failed: HTTP probe failed with statuscode: 500', 'DeadlineExceeded: progressDeadlineSeconds exceeded'],
+    }
+
+    const payload = {
+      incident_id: incId,
+      pod_name: podName,
+      namespace: action.namespace,
+      failure_type: action.type,
+      detected_at: new Date().toISOString(),
+      log_lines: logLinesMap[action.type] || ['Container error occurred'],
+    }
+
+    // 1. Instantly update UI Cockpit
     const base = MOCK_DIAGNOSES[0]
     addSimulated({
       ...base,
       id: `sim-${Date.now()}`,
-      incident_id: `sim-inc-${Date.now()}`,
+      incident_id: incId,
       created_at: new Date().toISOString(),
       failure_type: action.type,
       namespace: action.namespace,
-      pod_name: `sim-pod-${Math.random().toString(36).slice(2, 8)}`,
+      pod_name: podName,
     })
+
     setOpen(false)
-    setToast(`[SIMULATED] ${action.type} injected into ${action.namespace}`)
-    setTimeout(() => setToast(null), 3000)
+    setToast(`[CHAOS LAB] Injected ${action.type} into ${action.namespace}!`)
+
+    // 2. Dispatch to Backend Core & Slack
+    try {
+      await api.post('/incident', payload)
+      setToast(`⚡ ${action.type} dispatched to Core AI & Slack channel!`)
+    } catch (e) {
+      console.log('Dispatched simulated chaos event')
+    }
+
+    setTimeout(() => setToast(null), 3500)
   }
 
   return (
