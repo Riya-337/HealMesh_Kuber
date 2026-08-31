@@ -37,6 +37,18 @@ func NewWatcher(logger *zap.Logger) (*Watcher, error) {
 	var err error
 
 	kubeconfigPath := os.Getenv("KUBECONFIG_PATH")
+	if kubeconfigPath == "" {
+		kubeconfigPath = os.Getenv("KUBECONFIG")
+	}
+	if kubeconfigPath == "" {
+		if home, errHome := os.UserHomeDir(); errHome == nil {
+			candidate := home + "/.kube/config"
+			if _, statErr := os.Stat(candidate); statErr == nil {
+				kubeconfigPath = candidate
+			}
+		}
+	}
+
 	if kubeconfigPath != "" {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	} else {
