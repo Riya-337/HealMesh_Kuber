@@ -10,7 +10,7 @@ Extending it requires a DECISION_LOG.md entry AND full test coverage.
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -207,3 +207,80 @@ class IncidentSubmitResponse(BaseModel):
     # follow-up GET /diagnoses/{id} call (avoids PostgreSQL dependency
     # in environments where the audit DB is not running).
     diagnosis: Diagnosis | None = None
+
+
+class APITokenCapability(str, enum.Enum):
+    """Explicitly scoped token capabilities. Zero-trust: submit only."""
+    INCIDENT_SUBMIT = "INCIDENT_SUBMIT"
+
+
+class APITokenRecord(BaseModel):
+    """Persistent record of an API Token stored in PostgreSQL."""
+    model_config = {"extra": "forbid"}
+    token_id: UUID = Field(default_factory=uuid4)
+    token_hash: str = Field(min_length=64, max_length=64, description="SHA-256 hex digest of the raw bearer token")
+    name: str = Field(min_length=1, max_length=100)
+    capabilities: list[APITokenCapability] = Field(default_factory=lambda: [APITokenCapability.INCIDENT_SUBMIT])
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    is_active: bool = True
+    revoked_at: datetime | None = None
+
+    def is_valid(self) -> tuple[bool, str | None]:
+        """Returns (is_valid, failure_reason)."""
+        if not self.is_active or self.revoked_at is not None:
+            return False, "Token has been revoked"
+        now = datetime.now(timezone.utc)
+        exp = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
+        if now >= exp:
+            return False, "Token has expired"
+        return True, None
+
+
+class SDKIncidentSubmitRequest(BaseModel):
+    """
+    Ingress payload from external Python SDK callers.
+    Strict size bounding and RFC 1123 format enforcement.
+    """
+    model_config = {"extra": "forbid"}
+    namespace: str = Field(min_length=1, max_length=63, pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+    pod_name: str = Field(min_length=1, max_length=253, pattern=r"^[a-z0-9]([-a-z0-9\.]*[a-z0-9])?$")
+    container_name: str | None = Field(default=None, min_length=1, max_length=63, pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+    image: str | None = Field(default=None, max_length=253)
+    failure_type: FailureType
+    log_lines: list[str] = Field(default_factory=list, max_length=50)
+    extra_context: dict[str, str] | None = Field(default=None)
+
+    @field_validator("namespace")
+    @classmethod
+    def validate_not_denylisted(cls, v: str) -> str:
+        denylist = {"kube-system", "kube-public", "healmesh"}
+        if v in denylist:
+            raise ValueError(f"Namespace '{v}' is in the protected denylist and cannot be submitted via SDK")
+        return v
+
+    @field_validator("log_lines", mode="before")
+    @classmethod
+    def validate_and_truncate_log_lines(cls, v: list[Any]) -> list[str]:
+        if not isinstance(v, list):
+            return []
+        capped = v[:50]
+        # Bounding line length to max 200 chars per line
+        result: list[str] = []
+        for line in capped:
+            s = str(line)
+            if len(s) > 200:
+                result.append(s[:190] + " [TRUNCATED]")
+            else:
+                result.append(s)
+        return result
+
+
+class TokenIssuedResponse(BaseModel):
+    """One-time response returned to the admin CLI containing the raw bearer token."""
+    token_id: UUID
+    token: str
+    name: str
+    capabilities: list[str]
+    expires_at: datetime
+

@@ -37,6 +37,7 @@ from schema.models import Diagnosis, IncidentPayload, IncidentSubmitResponse
 from surface.slack.notifier import SlackNotifier
 from surface.slack.webhook import router as slack_router
 from surface.slack.interaction import router as interaction_router
+from api.sdk import router as sdk_router
 
 _MAX_LLM_CALLS_PER_MINUTE = int(os.environ.get("LLM_MAX_CALLS_PER_MINUTE", "30"))
 _call_times: list[float] = []
@@ -78,6 +79,7 @@ app = FastAPI(
 
 app.include_router(slack_router)
 app.include_router(interaction_router)
+app.include_router(sdk_router)
 
 
 @app.get("/health")

@@ -181,3 +181,51 @@ This file records every architecture decision that affects security invariants, 
 **Rationale:** The OpenAPI schema for CRDs cannot restrict `metadata.namespace`. A webhook is required to structurally guarantee that a policy cannot exist in protected namespaces. The webhook must fail closed (`failurePolicy: Fail`), as a fail-open configuration would silently remove this structural guarantee during a webhook outage. The executor's hardcoded check remains in place because the webhook only guards future `CREATE`/`UPDATE` events and cannot retroactively catch a bad policy created during a partial-rollout gap or if the webhook was temporarily bypassed. Both layers are structurally necessary.
 
 **Consequences:** `failurePolicy: Fail` is set on the webhook configuration. Executor code is unaffected and continues checking the denylist before any operation, in addition to checking the `HealPolicy`.
+
+---
+
+## ADR-013: Python SDK Scope (Diagnosis-Only), Token Lifecycle, and Ingress Guardrails
+
+**Date:** 2026-08-22  
+**Status:** Accepted  
+
+**Decision:** The HealMesh Client SDK (Python) and its corresponding API endpoint (`POST /api/v1/sdk/incident`) are introduced under the following non-negotiable architectural constraints:
+
+1. **Diagnosis-Only Pipeline Scope:** SDK-submitted incidents produce diagnoses (root cause, confidence, suggested manual command, parsed action enum), but **shall never** trigger automated remediation, enqueue Slack approval cards, or dispatch cluster mutation tasks to `healmesh-executor`.
+2. **Token Lifecycle & Zero-Trust Scope:** External callers authenticate via per-integration bearer tokens (`hm_live_<hex>`).
+   - Tokens are stored exclusively as SHA-256 hashes (`sha256(token)`). Raw tokens are generated via an admin CLI, displayed once, and never persisted.
+   - Tokens are explicitly scoped to `INCIDENT_SUBMIT` only. They possess zero read permissions across other tenants/endpoints and zero execution capability.
+   - Tokens enforce mandatory TTL expiry (default: 90 days) and explicit revocation. Revoked or expired tokens fail fast with `HTTP 401 Unauthorized`.
+   - All token lifecycle events (`TOKEN_ISSUED`, `TOKEN_REVOKED`, `TOKEN_AUTH_FAILED`) are permanently written to the append-only audit log.
+3. **Hierarchical Ingress Rate Limiting:**
+   - Layer 1 (Per-Token): Capped at `10 req/min/token` (`SDK_TOKEN_MAX_CALLS_PER_MINUTE`).
+   - Layer 2 (Aggregate SDK Ingress): Capped at `20 req/min total` (`SDK_AGGREGATE_MAX_CALLS_PER_MINUTE`).
+   - Layer 3 (Global Core LLM Budget): Capped at `30 calls/min overall` (`LLM_MAX_CALLS_PER_MINUTE`, TDD §3.2).
+   - This hierarchy structurally guarantees a reserved floor of at least 10 LLM calls/minute for cluster-native Event Watcher incidents during SDK traffic bursts.
+4. **Network & Ingress Guardrails:**
+   - Mandatory HTTPS (TLS 1.2 / TLS 1.3) with HSTS. Plain HTTP is rejected.
+   - Hard request size bounding: body size ≤ 64 KB, log snippet ≤ 50 lines, line length ≤ 200 chars.
+   - Strict Pydantic V2 schema validation and automated credential/secret regex scrubbing.
+
+**Rationale:** An external SDK caller crossing the public network boundary is untrusted input that cannot prove in-cluster state or namespace ownership. Restricting SDK entries to diagnosis-only provides maximum operational value (automated triage in CI/CD, local debugging, alert pipelines) while preventing unauthenticated or multi-tenant cluster mutation attacks. Capping aggregate SDK traffic protects the in-cluster Event Watcher's LLM quota.
+
+**Consequences:** `healmesh-core` implements token management, auth middleware, and the `/api/v1/sdk/incident` endpoint without any wiring to the executor write path. The Python SDK package (`healmesh-sdk-python`) communicates directly via `httpx` with zero orchestration middleware.
+
+---
+
+## ADR-014: Slack as Durable Primary Human Interface & Formal Deferral of Production Web Dashboard
+
+**Date:** 2026-08-22  
+**Status:** Accepted  
+
+**Decision:** 
+
+1. **Slack as Canonical Human Interface:** Slack is established as the sole, durable Human-in-the-Loop remediation and diagnosis interface for HealMesh across Phases 1, 2, and 3. All human sign-offs occur exclusively through Slack Block Kit approval cards guarded by HMAC-SHA256 signature verification, the ADR-009 approver allowlist, and the ADR-010 sliding-window rate limiter.
+2. **Formal Deferral of Web Dashboard Backend Wiring:** Implementation of a production-grade Web Dashboard backend (including OIDC/OAuth2 authentication gateways, session management, and dedicated web approval REST endpoints) is formally deferred.
+3. **Retention of `healmesh-ui` as a Standalone Specification Artifact:** The existing React/Three.js frontend in `healmesh-ui/` is retained in the repository as an unwired, client-side visual specification, architecture walkthrough, and interactive demo artifact (including Chaos Lab frontend simulation mode). It is explicitly not connected to cluster mutation or backend approval endpoints.
+4. **Future Implementation Trigger Condition:** Backend wiring and production hardening of the Dashboard shall occur only when real production cluster deployments generate sufficient incident volume to make single-channel Slack triage unwieldy, satisfying the demand-gating requirement of CONSTITUTION.md Article 3.
+5. **Phase 3 Closure:** Phase 3 is formally finalized and closed as **"Phase 3 Complete: Multi-Action Engine, HealPolicy CRD, and Slack Human-in-the-Loop Pipeline"**.
+
+**Rationale:** Slack is already fully implemented, tested, and cryptographically verified in `healmesh-core`. Speculatively engineering a full web identity provider and browser session layer before establishing live pilot clusters or production traffic introduces unmaintained code complexity and expands the security attack surface without operational justification. Retaining `healmesh-ui` as a visual demonstration and specification preserves its design value while maintaining zero cluster blast radius.
+
+**Consequences:** Phase 3 is formally closed. The core service exposes only the Slack interaction webhook (`/slack/actions`) and the diagnosis-only Python SDK ingress (`/api/v1/sdk/incident`). `healmesh-ui` remains available for local demonstration without holding credentials or write access to cluster infrastructure.

@@ -82,3 +82,34 @@ def test_audit_logger_has_no_class_level_update_or_delete():
     assert forbidden == [], (
         f"CONSTITUTION VIOLATION: AuditLogger class dict contains forbidden names: {forbidden}"
     )
+
+
+def test_token_repository_audit_has_no_mutation_methods():
+    """
+    INVARIANT: TokenRepository audit methods must only append (issue, log_auth_failure).
+    No update or delete methods may exist for audit log entries.
+    """
+    from auth.token_repo import TokenRepository
+    members = dict(inspect.getmembers(TokenRepository, predicate=inspect.isfunction))
+    forbidden_audit_mutations = [
+        name for name in members
+        if any(word in name.lower() for word in ("delete_audit", "update_audit", "purge_audit", "remove_audit"))
+    ]
+    assert forbidden_audit_mutations == [], (
+        f"CONSTITUTION VIOLATION: TokenRepository has forbidden audit mutation methods: {forbidden_audit_mutations}"
+    )
+
+
+def test_migration_002_enforces_deny_mutation_trigger():
+    """
+    Verify that infra/postgres/002_api_tokens.sql explicitly binds the
+    deny_mutation() trigger to healmesh.api_token_audit_logs.
+    """
+    migration_path = os.path.join(os.path.dirname(__file__), "..", "..", "infra", "postgres", "002_api_tokens.sql")
+    with open(migration_path, "r") as f:
+        sql = f.read()
+
+    assert "CREATE TRIGGER enforce_append_only_token_audit" in sql
+    assert "BEFORE UPDATE OR DELETE ON healmesh.api_token_audit_logs" in sql
+    assert "EXECUTE FUNCTION healmesh.deny_mutation()" in sql
+

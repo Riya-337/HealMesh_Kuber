@@ -47,3 +47,7 @@ logs/
 # PDF extracts (generated files)
 *.txt
 healmesh-k8s/executor_bin
+
+# Certs and legacy backup dirs
+infra/certs/
+healmesh-ui-legacy/
