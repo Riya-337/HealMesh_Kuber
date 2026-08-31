@@ -297,7 +297,7 @@ export default function IncidentDrawer() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="label-style text-xs">AI Root Cause Diagnosis</span>
-                  <span className="text-[10px] text-cyan-300 font-mono">(Groq · Llama 3.1)</span>
+                  <span className="text-[10px] text-cyan-300 font-mono">({selected.llm_model || 'Google Gemini 2.5 Flash'})</span>
                 </div>
                 <ConfidenceBadge level={selected.confidence} />
               </div>

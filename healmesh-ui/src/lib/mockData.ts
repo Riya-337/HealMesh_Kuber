@@ -12,7 +12,7 @@ export const MOCK_DIAGNOSES: Diagnosis[] = [
     pod_name: 'payments-service-6f8d7f',
     namespace: 'payments',
     confidence: 'high',
-    llm_model: 'llama-3.1-8b-instant',
+    llm_model: 'gemini-2.5-flash',
     root_cause:
       'The pod is crashing because it cannot connect to the PostgreSQL database. ' +
       'The connection is being refused on 10.0.15.23:5432. This is causing the ' +
