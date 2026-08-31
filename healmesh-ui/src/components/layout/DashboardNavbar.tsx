@@ -46,22 +46,22 @@ export default function DashboardNavbar() {
 
       <div className="flex-1" />
 
-      {/* Groq badge */}
+      {/* Gemini badge */}
       <div className="relative flex-shrink-0">
         <button
           className="flex items-center gap-1.5 text-hm-cyan text-xs hover:text-white transition-colors py-1.5 px-3 rounded-full bg-white/5 border border-white/10 hover:bg-white/10"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
-          <Zap size={13} />
-          <span className="font-serif font-bold whitespace-nowrap">Groq · Llama 3.1</span>
+          <Zap size={13} className="text-cyan-400" />
+          <span className="font-serif font-bold whitespace-nowrap">Gemini · 2.5 Flash</span>
         </button>
         {showTooltip && (
           <div className="absolute top-full right-0 mt-2 glass-card p-4 w-60 z-50 text-left border-t border-white/40 shadow-2xl">
             <div className="label-style mb-2 text-hm-cyan">Inference Engine</div>
             <div className="space-y-1 text-xs text-white/80 font-serif">
-              <div>Provider: <strong className="text-white">Groq LPU</strong></div>
-              <div className="font-mono text-[11px] text-hm-cyan">Model: llama-3.1-8b-instant</div>
+              <div>Provider: <strong className="text-white">Google AI Studio</strong></div>
+              <div className="font-mono text-[11px] text-hm-cyan">Model: gemini-2.5-flash</div>
               <div className="text-white/50 text-[11px]">Direct SDK invocation (zero middleware)</div>
             </div>
           </div>

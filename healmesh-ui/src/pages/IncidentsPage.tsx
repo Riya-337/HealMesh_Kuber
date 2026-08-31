@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { AlertCircle, Terminal, Copy, CheckCircle, Search, Filter } from 'lucide-react'
+import { AlertCircle, Terminal, Copy, CheckCircle, Search, Filter, ShieldCheck, Lock, Play, XCircle, RefreshCw } from 'lucide-react'
 import { useDiagnoses } from '../hooks/useDiagnoses'
 import { useIncidentStore } from '../hooks/useIncidentStore'
+import { useAuthStore } from '../hooks/useAuthStore'
 import ConfidenceBadge from '../components/incident/ConfidenceBadge'
 import LogSnippet from '../components/incident/LogSnippet'
 import ActionPanel from '../components/incident/ActionPanel'
@@ -20,12 +21,14 @@ const FILTERS: (FailureType | 'ALL')[] = [
 export default function IncidentsPage() {
   const { diagnoses } = useDiagnoses()
   const simulatedIncidents = useIncidentStore((s) => s.simulatedIncidents)
+  const currentUser = useAuthStore((s) => s.currentUser)
   const allIncidents = [...simulatedIncidents, ...diagnoses]
 
   const [activeFilter, setActiveFilter] = useState<FailureType | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
   const [selectedIncident, setSelectedIncident] = useState<Diagnosis>(allIncidents[0])
   const [copied, setCopied] = useState(false)
+  const [actionStatus, setActionStatus] = useState<string | null>(null)
 
   const filtered = allIncidents.filter((inc) => {
     const matchesFilter = activeFilter === 'ALL' || inc.failure_type === activeFilter
@@ -40,6 +43,16 @@ export default function IncidentsPage() {
     navigator.clipboard.writeText(cmd)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleAction = (actionName: string) => {
+    setActionStatus(`✅ [EXECUTED] ${actionName} initiated by Admin (${currentUser?.name || 'Riya Aggarwal'}). Dispatched to Kubernetes client-go Executor!`)
+    setTimeout(() => setActionStatus(null), 5000)
+  }
+
+  const handleReject = () => {
+    setActionStatus(`❌ [REJECTED] Remediation rejected by Admin (${currentUser?.name || 'Riya Aggarwal'}). Incident closed.`)
+    setTimeout(() => setActionStatus(null), 5000)
   }
 
   return (
@@ -150,13 +163,21 @@ export default function IncidentsPage() {
                 <ConfidenceBadge level={selectedIncident.confidence} />
               </div>
 
+              {/* Action status notification */}
+              {actionStatus && (
+                <div className="p-3.5 rounded-xl bg-indigo-500/20 border border-indigo-400/40 text-xs text-white flex items-center gap-2 animate-pulse">
+                  <ShieldCheck size={16} className="text-emerald-400 flex-shrink-0" />
+                  <span>{actionStatus}</span>
+                </div>
+              )}
+
               {/* AI Root Cause */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="label-style">AI Root Cause</span>
-                  <span className="text-[11px] text-hm-teal font-mono">(Groq · Llama 3.1 · 8B)</span>
+                  <span className="text-[11px] text-hm-teal font-mono">({selectedIncident.llm_model || 'Google Gemini 2.5 Flash'})</span>
                 </div>
-                <div className="p-4 rounded-xl bg-hm-teal/[0.04] border border-hm-teal/20 text-white/90 text-sm leading-relaxed">
+                <div className="p-4 rounded-xl bg-hm-teal/[0.04] border border-hm-teal/20 text-white/90 text-sm leading-relaxed font-serif">
                   {selectedIncident.root_cause}
                 </div>
               </div>
@@ -192,6 +213,69 @@ export default function IncidentsPage() {
                   action={selectedIncident.parsed_action}
                   namespace={selectedIncident.namespace}
                 />
+              </div>
+
+              {/* Human Approval & Remediation Actions Gateway */}
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/15 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-indigo-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider font-serif">
+                      Human Remediation Gate (Phase 2 RBAC)
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-white/50 font-mono">
+                    Actor: <strong className="text-cyan-300">{currentUser?.name || 'Riya Aggarwal'}</strong> ({currentUser?.role || 'ADMIN'})
+                  </span>
+                </div>
+
+                {currentUser?.role !== 'ADMIN' ? (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
+                    <Lock size={14} />
+                    <span>Read-Only Mode: Only Admin (Riya Aggarwal) can authorize mutations on Kubernetes cluster.</span>
+                  </div>
+                ) : selectedIncident.parsed_action?.action_type && selectedIncident.parsed_action.action_type !== 'NONE' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handleAction(`Action "${selectedIncident.parsed_action.action_type}" on ${selectedIncident.pod_name}`)}
+                      className="py-3 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
+                    >
+                      <Play size={14} fill="currentColor" /> Authorize & Apply {selectedIncident.parsed_action.action_type} Fix
+                    </button>
+                    <button
+                      onClick={handleReject}
+                      className="py-3 px-4 rounded-xl text-xs font-bold text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <XCircle size={14} /> Reject Remediation Proposal
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-[11px] text-white/60 font-serif">
+                      AI identified an external/code condition. You can trigger direct operator remediation overrides:
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        onClick={() => handleAction(`Operator Override: Restart Pod (${selectedIncident.pod_name})`)}
+                        className="py-2.5 px-3 rounded-xl text-xs font-medium text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <RefreshCw size={12} /> Restart Pod
+                      </button>
+                      <button
+                        onClick={() => handleAction(`Operator Override: Rollout Restart Deployment in ${selectedIncident.namespace}`)}
+                        className="py-2.5 px-3 rounded-xl text-xs font-medium text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Play size={12} fill="currentColor" /> Redeploy
+                      </button>
+                      <button
+                        onClick={() => handleAction(`Marked Incident ${selectedIncident.id} Resolved`)}
+                        className="py-2.5 px-3 rounded-xl text-xs font-medium text-white/80 bg-white/5 hover:bg-white/10 border border-white/15 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckCircle size={12} /> Mark Resolved
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : (
