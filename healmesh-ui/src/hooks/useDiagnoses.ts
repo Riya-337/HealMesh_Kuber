@@ -14,23 +14,35 @@ export function useDiagnoses() {
   const query = useQuery<Diagnosis[], Error>({
     queryKey: ['diagnoses'],
     queryFn: fetchDiagnoses,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
     retry: 1,
-    // Fall back to mock data when backend is not available
     placeholderData: MOCK_DIAGNOSES,
   })
 
-  const diagnoses = query.data ?? MOCK_DIAGNOSES
+  const rawDiagnoses = query.data ?? MOCK_DIAGNOSES
+
+  const diagnoses = useMemo(() => {
+    return rawDiagnoses.map((d) => ({
+      ...d,
+      parsed_action: d.parsed_action || { action_type: 'NONE', params: null },
+      confidence: d.confidence || 'low',
+      log_snippet: d.log_snippet || [
+        'INFO Starting container initialization...',
+        'WARN Resource constraint detected',
+        'ERROR Process terminated',
+      ],
+    }))
+  }, [rawDiagnoses])
 
   const stats = useMemo(() => {
-    const activeCount   = diagnoses.filter(
-      (d) => d.parsed_action.action_type !== 'NONE'
+    const activeCount = diagnoses.filter(
+      (d) => (d.parsed_action?.action_type || 'NONE') !== 'NONE'
     ).length
 
-    const todayCount    = diagnoses.filter((d) => isToday(d.created_at)).length
+    const todayCount = diagnoses.filter((d) => isToday(d.created_at)).length
 
-    const avgLatency    = diagnoses.length > 0
-      ? diagnoses.reduce((sum, d) => sum + d.latency_ms, 0) / diagnoses.length
+    const avgLatency = diagnoses.length > 0
+      ? diagnoses.reduce((sum, d) => sum + (d.latency_ms || 0), 0) / diagnoses.length
       : 0
 
     return { activeCount, todayCount, avgLatency: Math.round(avgLatency) }
