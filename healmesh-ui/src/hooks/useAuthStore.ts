@@ -69,7 +69,8 @@ export const useAuthStore = create<AuthState>()(
       setIsAccessModalOpen: (open) => set({ isAccessModalOpen: open }),
 
       login: (email) => {
-        const user = get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+        const trimmedEmail = email.trim().toLowerCase()
+        const user = get().users.find((u) => u.email.trim().toLowerCase() === trimmedEmail)
         if (!user) {
           return { success: false, message: 'User account not found. Please request access.' }
         }
@@ -165,3 +166,11 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'healmesh-auth-store-v2') {
+      useAuthStore.persist.rehydrate()
+    }
+  })
+}
